@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      name: falco
+      labels:
+        container_name: falco
+    spec:
+      initContainers:
+      - name: falco-driver-loader
+        env:
+        - name: FALCO_BPF_PROBE
+          value: ""
+      containers:
+      - name: falco
+        args:
+        - /usr/bin/falco
+        - --cri
+        - /run/containerd/containerd.sock
+        - --cri
+        - /run/crio/crio.sock
+        - --k8s-node
+        - "$(FALCO_K8S_NODE_NAME)"
+        - -pk
+        env:
+        - name: FALCO_BPF_PROBE
+          value: ""
+        volumeMounts:
+        - name: rules-volume
+          mountPath: /etc/falco/rules.d
+        tty: true
+      volumes:
+      - name: rules-volume
+        configMap:
+          name: falco-rules-custom
+      tolerations:
+      - value: gvisor
+        effect: NoSchedule
+        key: sandbox.gke.io/runtime
+        operator: Equal
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master

@@ -1,0 +1,200 @@
+# Google Cloud Platform adversarial detection ruleset starter
+#
+# Author: Mike Gualtieri
+#         Gatsby, Inc.
+#         <mike.gualtieri@gatsbyjs.com>
+#
+# Provided as supplimental material for the talk:
+#   "Crafting Adversarial Detections at Scale in Google Cloud Platform"
+#   SANS Pen Test HackFest Summit - November 2022
+#
+# Configure these rules as GCP log-based alerts
+#   https://cloud.google.com/logging/docs/alerting/log-based-alerts
+#
+# To filter our known user or service account use append a filter
+# like the following to the rule:
+#   -protoPayload.authenticationInfo.principalEmail="employee@domain.com"
+#
+# Edit each rule to reflect your GCP project name (your-project-name)
+#
+
+- title: Compute Instance Detected Using the Default Compute Service Account
+  reason: Prevention
+  log_query: 
+    resource.type="gce_instance"
+    protoPayload.request.serviceAccounts.email="<your_project_id>-compute@developer.gserviceaccount.com"
+
+
+- title: Owner/Editor/Viewer permission activity delta
+  reason: Prevention
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="project"
+    resource.labels.project_id="your-project-name"
+    protoPayload.serviceData.policyDelta.bindingDeltas.action="ADD"
+    (protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/owner" 
+     OR protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/editor" 
+     OR protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/viewer")
+
+
+- title: Data Access Log - Permission Denied
+  reason: Detect events following initial access 
+  gcp_log_type: data_access
+  required_audit_log: Identity and Access Management (IAM) API 
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    (protoPayload.status.message="PERMISSION_DENIED" OR protoPayload.status.code="7")
+
+
+- title: Permission denied impersonating service account
+  reason: Detect events following initial access 
+  gcp_log_type: data_access
+  required_audit_log: Identity and Access Management (IAM) API 
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    resource.type="service_account"
+    protoPayload.methodName="GenerateAccessToken"
+    protoPayload.@type="type.googleapis.com/google.cloud.audit.AuditLog"
+    (protoPayload.status.message="PERMISSION_DENIED" OR protoPayload.status.code="7")
+    severity=ERROR
+
+
+- title: Permission denied listing service accounts
+  reason: Detect events following initial access 
+  gcp_log_type: data_access
+  required_audit_log: Identity and Access Management (IAM) API 
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    protoPayload.methodName="google.iam.admin.v1.ListServiceAccounts"
+    protoPayload.status.code="7" 
+
+
+- title: A firewall egress DENY event has been triggered
+  reason: Detect events following initial access 
+  gcp_log_type: firewall
+  log_query: 
+    logName:(projects/your-project-name/logs/compute.googleapis.com%2Ffirewall) 
+    AND jsonPayload.rule_details.reference=~".*your_deny_rule_name.*"
+
+
+- title: Account has listed Secret Manager Secrets
+  reason: Detect events to access sensitive data
+  gcp_log_type: data_access
+  required_audit_log: Secret Manager API
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    resource.type="audited_resource"
+    protoPayload.methodName="google.cloud.secretmanager.v1.SecretManagerService.ListSecrets"
+
+
+- title: Account has listed Service Accounts
+  reason: Detect events to access sensitive data
+  gcp_log_type: data_access
+  required_audit_log: Identity and Access Management (IAM) API 
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    protoPayload.methodName="google.iam.admin.v1.ListServiceAccounts"
+
+
+- title: Account has retrieved IAM Role details
+  reason: Detect events to access sensitive data
+  gcp_log_type: data_access
+  required_audit_log: Identity and Access Management (IAM) API 
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    protoPayload.methodName="google.iam.admin.v1.GetRole"
+
+
+- title: List Cloud Functions
+  reason: Detect events to access sensitive data
+  required_audit_log: Cloud Functions API 
+  gcp_log_type: data_access
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    protoPayload.serviceName="cloudfunctions.googleapis.com"
+    protoPayload.methodName="google.cloud.functions.v1.CloudFunctionsService.ListFunctions"
+
+
+- title: Call to method CreateServiceAccount detected
+  reason: Detect lateral movement
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="service_account"
+    resource.labels.project_id="your-project-name"
+    (protoPayload.methodName="google.iam.admin.v1.CreateServiceAccount")
+
+
+- title: Call to method CreateServiceAccountKey detected
+  reason: Detect lateral movement
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="service_account"
+    resource.labels.project_id="your-project-name"
+    (protoPayload.methodName="google.iam.admin.v1.CreateServiceAccountKey")
+
+
+- title: SSH keys have been added to instance
+  reason: Detect lateral movement
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="gce_instance"
+    protoPayload.metadata.instanceMetadataDelta.addedMetadataKeys="ssh-keys"
+
+
+- title: SetIamPolicy role delta
+  reason: Detect lateral movement
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="project"
+    resource.labels.project_id="your-project-name"
+    protoPayload.methodName="SetIamPolicy"
+    protoPayload.serviceData.policyDelta.bindingDeltas.role:*
+
+
+- title: Firewall rule manually inserted with sourceRange of 0.0.0.0/0
+  reason: Detect events that maintain a foothold
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="gce_firewall_rule"
+    resource.labels.project_id="your-project-name"
+    protoPayload.methodName="v1.compute.firewalls.insert"
+    protoPayload.request.sourceRanges="0.0.0.0/0"
+
+
+- title: Firewall rules have been manually changed
+  reason: Detect events that maintain a foothold
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="gce_firewall_rule"
+    resource.labels.project_id="your-project-name"
+    (protoPayload.methodName="v1.compute.firewalls.insert" OR protoPayload.methodName="v1.compute.firewalls.delete") 
+
+
+- title: GCS Bucket IAM permissions have been adjusted
+  reason: Detect events that maintain a foothold
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type=gcs_bucket
+    protoPayload.serviceName="storage.googleapis.com"
+    protoPayload.methodName="storage.setIamPermissions" 
+
+
+- title: Cloud Functions generated upload/download URLs
+  reason: Detect events that maintain a foothold
+  required_audit_log: Cloud Functions API 
+  gcp_log_type: data_access
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Fdata_access"
+    protoPayload.serviceName="cloudfunctions.googleapis.com"
+    (protoPayload.methodName="google.cloud.functions.v1.CloudFunctionsService.GenerateDownloadUrl" 
+     OR protoPayload.methodName="google.cloud.functions.v1.CloudFunctionsService.GenerateUploadUrl")
+
+
