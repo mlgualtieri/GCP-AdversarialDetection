@@ -14,6 +14,10 @@
 # To filter our known user or service account use append a filter
 # like the following to the rule:
 #   -protoPayload.authenticationInfo.principalEmail="employee@domain.com"
+# 
+# To filter out unauthenticated permission denied events append a filter
+# like the following to the rule:
+#   -protoPayload.authenticationInfo.principalEmail=""
 #
 # Edit each rule to reflect your GCP project name (your-project-name)
 #
