@@ -160,6 +160,18 @@
     protoPayload.serviceData.policyDelta.bindingDeltas.role:*
 
 
+- title: IAM Role delta
+  reason: Detect lateral movement
+  gcp_log_type: activity
+  log_query: 
+    logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
+    resource.type="iam_role"
+    resource.labels.project_id="your-project-name"
+    (protoPayload.methodName="google.iam.admin.v1.CreateRole"
+     OR protoPayload.methodName="google.iam.admin.v1.DeleteRole"
+     OR protoPayload.methodName="google.iam.admin.v1.UpdateRole")
+
+
 - title: Firewall rule manually inserted with sourceRange of 0.0.0.0/0
   reason: Detect events that maintain a foothold
   gcp_log_type: activity
