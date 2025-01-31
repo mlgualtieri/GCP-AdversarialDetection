@@ -36,7 +36,8 @@
     logName="projects/your-project-name/logs/cloudaudit.googleapis.com%2Factivity"
     resource.type="project"
     resource.labels.project_id="your-project-name"
-    protoPayload.serviceData.policyDelta.bindingDeltas.action="ADD"
+    (protoPayload.serviceData.policyDelta.bindingDeltas.action="ADD"
+     OR protoPayload.serviceData.policyDelta.bindingDeltas.action="REMOVE")
     (protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/owner" 
      OR protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/editor" 
      OR protoPayload.serviceData.policyDelta.bindingDeltas.role="roles/viewer")
